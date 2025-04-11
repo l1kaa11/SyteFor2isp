@@ -39,6 +39,35 @@ let scheduleChanges = [];
 // Добавим глобальную переменную для отслеживания статуса админа
 let isAdmin = false;
 
+// Константы для работы с Google Sheets
+const SPREADSHEET_ID = '1Nrwmoc4E9NQgGuY_00WKbSnTgMnwaXsS0GSjcrQCW5I';
+const API_KEY = 'AIzaSyCJhJLtNd3ORhtTgn9MR7ttdAscffKqa20'; // Замените на ваш API ключ
+const RANGE = 'A:F'; // Диапазон данных
+
+// Функция для получения данных из Google Sheets
+async function fetchChangesFromGoogleSheets() {
+    try {
+        const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${RANGE}?key=${API_KEY}`);
+        const data = await response.json();
+        
+        if (data.values && data.values.length > 1) { // Пропускаем заголовок
+            scheduleChanges = data.values.slice(1).map(row => ({
+                date: row[0],
+                para: row[1],
+                original: row[2],
+                teacher: row[3],
+                replacement: row[4],
+                newTeacher: row[5]
+            }));
+            
+            updateScheduleChanges();
+            displaySchedule();
+        }
+    } catch (error) {
+        console.error('Ошибка при получении данных:', error);
+    }
+}
+
 // Функция для получения дежурных на конкретную дату
 function getDutyPersonsForDate(date) {
     const startDate = new Date('2024-01-01');
@@ -319,42 +348,27 @@ function clearAllChanges() {
     }
 }
 
-// Функция для загрузки файла с заменами
-function loadChangesFromFile(event) {
+// Заменяем старую функцию загрузки изменений
+async function loadChangesFromFile(event) {
     const file = event.target.files[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = async function(e) {
         try {
-            const content = e.target.result;
-            const lines = content.split('\n');
-            const newChanges = [];
-
-            lines.forEach(line => {
-                if (line.trim()) {
-                    const parts = line.split('|').map(part => part.trim());
-                    if (parts.length >= 5) {
-                        newChanges.push({
-                            para: parts[0] || '—',
-                            original: parts[1] || '—',
-                            teacher: parts[2] || '—',
-                            replacement: parts[3] || '—',
-                            newTeacher: parts[4] || '—'
-                        });
-                    }
-                }
-            });
-
-            if (newChanges.length > 0) {
-                scheduleChanges = newChanges;
-                localStorage.setItem('scheduleChanges', JSON.stringify(scheduleChanges));
-                updateScheduleChanges();
-                showNotification('Замены успешно загружены из файла', 'success');
-            }
+            const text = e.target.result;
+            const changes = JSON.parse(text);
+            
+            // Здесь можно добавить код для обновления Google таблицы
+            // через Google Sheets API, если нужно
+            alert('Функция обновления таблицы будет реализована позже');
+            
+            // Обновляем локальные данные
+            scheduleChanges = changes;
+            updateScheduleChanges();
+            displaySchedule();
         } catch (error) {
-            showNotification('Ошибка при чтении файла', 'error');
-            console.error('Error reading file:', error);
+            alert('Ошибка при обработке файла: ' + error.message);
         }
     };
     reader.readAsText(file);
@@ -417,4 +431,10 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Обновляем изменения каждые 30 минут
     setInterval(updateScheduleChanges, 30 * 60 * 1000);
-}); 
+});
+
+// Запускаем проверку обновлений каждые 5 минут
+setInterval(fetchChangesFromGoogleSheets, 5 * 60 * 1000);
+
+// Загружаем данные при старте
+fetchChangesFromGoogleSheets(); 
