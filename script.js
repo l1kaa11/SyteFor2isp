@@ -265,108 +265,182 @@ async function updateScheduleChanges() {
     const changesContainer = document.getElementById('schedule-changes-list');
     changesContainer.innerHTML = '';
 
-    // Загружаем сохраненные замены
-    const savedChanges = localStorage.getItem('scheduleChanges');
-    if (savedChanges) {
-        scheduleChanges = JSON.parse(savedChanges);
-    }
-
-    if (!Array.isArray(scheduleChanges) || scheduleChanges.length === 0) {
+    if (scheduleChanges.length === 0) {
         changesContainer.innerHTML = '<p class="no-changes">На сегодня замен нет</p>';
     } else {
         scheduleChanges.forEach((change, index) => {
-            // Проверяем, что хотя бы одно из полей замены не пустое и не содержит прочерк
-            if (change.original !== '—' || change.replacement !== '—' || 
-                change.teacher !== '—' || change.newTeacher !== '—') {
-                const changeElement = document.createElement('div');
-                changeElement.className = 'change-item';
-                changeElement.innerHTML = `
-                    <h4>${change.para ? change.para + '-я пара' : 'Без номера пары'}</h4>
-                    <p>Было: ${change.original} (${change.teacher})</p>
-                    <p>Стало: ${change.replacement} (${change.newTeacher})</p>
-                    ${isAdmin ? `<button onclick="deleteChange(${index})" class="delete-change">Удалить</button>` : ''}
-                `;
-                changesContainer.appendChild(changeElement);
-            }
+            const changeElement = document.createElement('div');
+            changeElement.className = 'change-item';
+            changeElement.innerHTML = `
+                <h4>${change.para ? change.para + '-я пара' : 'Без номера пары'}</h4>
+                <p>Было: ${change.original} (${change.teacher})</p>
+                <p>Стало: ${change.replacement} (${change.newTeacher})</p>
+                ${isAdmin ? `<button onclick="deleteChange(${index})" class="delete-change">Удалить</button>` : ''}
+            `;
+            changesContainer.appendChild(changeElement);
         });
     }
 
-    // Обновляем время последнего обновления
     document.getElementById('last-update-time').textContent = new Date().toLocaleString();
 }
 
 // Функция для добавления новой замены
 function addScheduleChange() {
-    // Получаем значения полей
-    const para = document.getElementById('change-para').value.trim();
-    const original = document.getElementById('change-original').value.trim();
-    const teacher = document.getElementById('change-teacher').value.trim();
-    const replacement = document.getElementById('change-replacement').value.trim();
-    const newTeacher = document.getElementById('change-new-teacher').value.trim();
+    const para = document.getElementById('change-para').value;
+    const original = document.getElementById('change-original').value;
+    const teacher = document.getElementById('change-teacher').value;
+    const replacement = document.getElementById('change-replacement').value;
+    const newTeacher = document.getElementById('change-new-teacher').value;
 
     const change = {
-        para: parseInt(para) || '',
+        para: para || '—',
         original: original || '—',
         teacher: teacher || '—',
         replacement: replacement || '—',
         newTeacher: newTeacher || '—'
     };
 
-    // Инициализируем массив, если он пустой
-    if (!Array.isArray(scheduleChanges)) {
-        scheduleChanges = [];
-    }
-
+    // Добавляем замену в массив
     scheduleChanges.push(change);
-    localStorage.setItem('scheduleChanges', JSON.stringify(scheduleChanges));
+    
+    // Генерируем содержимое файла changes.js
+    let fileContent = '// Здесь хранятся все замены\n';
+    fileContent += 'const scheduleChangesData = [\n';
+    scheduleChanges.forEach((change, index) => {
+        fileContent += '    {\n';
+        fileContent += `        para: "${change.para}",\n`;
+        fileContent += `        original: "${change.original}",\n`;
+        fileContent += `        teacher: "${change.teacher}",\n`;
+        fileContent += `        replacement: "${change.replacement}",\n`;
+        fileContent += `        newTeacher: "${change.newTeacher}"\n`;
+        fileContent += '    }' + (index < scheduleChanges.length - 1 ? ',' : '') + '\n';
+    });
+    fileContent += '];';
+
+    // Создаем файл для скачивания
+    const blob = new Blob([fileContent], { type: 'text/javascript' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'changes.js';
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
     
     // Очищаем форму
     document.getElementById('changes-form').reset();
     
     // Обновляем отображение
     updateScheduleChanges();
-    
-    // Показываем уведомление
-    showNotification('Замена добавлена');
+    showNotification('Замена добавлена. Загрузите файл changes.js на GitHub', 'info');
 }
 
 // Функция для удаления замены
 function deleteChange(index) {
     scheduleChanges.splice(index, 1);
-    localStorage.setItem('scheduleChanges', JSON.stringify(scheduleChanges));
+    
+    // Генерируем новый файл changes.js
+    let fileContent = '// Здесь хранятся все замены\n';
+    fileContent += 'const scheduleChangesData = [\n';
+    scheduleChanges.forEach((change, i) => {
+        fileContent += '    {\n';
+        fileContent += `        para: "${change.para}",\n`;
+        fileContent += `        original: "${change.original}",\n`;
+        fileContent += `        teacher: "${change.teacher}",\n`;
+        fileContent += `        replacement: "${change.replacement}",\n`;
+        fileContent += `        newTeacher: "${change.newTeacher}"\n`;
+        fileContent += '    }' + (i < scheduleChanges.length - 1 ? ',' : '') + '\n';
+    });
+    fileContent += '];';
+
+    // Создаем файл для скачивания
+    const blob = new Blob([fileContent], { type: 'text/javascript' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'changes.js';
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    
     updateScheduleChanges();
-    showNotification('Замена удалена');
+    showNotification('Замена удалена. Загрузите файл changes.js на GitHub', 'info');
 }
 
 // Функция для очистки всех замен
 function clearAllChanges() {
-    if (confirm('Вы уверены, что хотите удалить все замены?')) {
-        scheduleChanges = [];
-        localStorage.setItem('scheduleChanges', JSON.stringify(scheduleChanges));
-        updateScheduleChanges();
-        showNotification('Все замены удалены');
+    scheduleChanges = [];
+    
+    // Генерируем пустой файл changes.js
+    const fileContent = '// Здесь хранятся все замены\nconst scheduleChangesData = [];';
+    
+    // Создаем файл для скачивания
+    const blob = new Blob([fileContent], { type: 'text/javascript' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'changes.js';
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    
+    updateScheduleChanges();
+    showNotification('Все замены очищены. Загрузите файл changes.js на GitHub', 'info');
+}
+
+// Функция для проверки обновлений
+async function checkForUpdates() {
+    try {
+        const response = await fetch('changes.js?' + new Date().getTime());
+        const text = await response.text();
+        const newChanges = JSON.parse(text.match(/scheduleChangesData\s*=\s*(\[[\s\S]*?\])/)[1]);
+        
+        if (JSON.stringify(scheduleChanges) !== JSON.stringify(newChanges)) {
+            scheduleChanges = newChanges;
+            updateScheduleChanges();
+            displaySchedule();
+        }
+    } catch (error) {
+        console.error('Ошибка при проверке обновлений:', error);
     }
 }
 
-// Заменяем старую функцию загрузки изменений
-async function loadChangesFromFile(event) {
+// Функция для загрузки файла с заменами
+function loadChangesFromFile(event) {
     const file = event.target.files[0];
     if (!file) return;
 
     const reader = new FileReader();
     reader.onload = async function(e) {
         try {
-            const text = e.target.result;
-            const changes = JSON.parse(text);
-            
-            // Здесь можно добавить код для обновления Google таблицы
-            // через Google Sheets API, если нужно
-            alert('Функция обновления таблицы будет реализована позже');
-            
-            // Обновляем локальные данные
-            scheduleChanges = changes;
-            updateScheduleChanges();
-            displaySchedule();
+            const content = e.target.result;
+            const lines = content.split('\n');
+            const newChanges = [];
+
+            lines.forEach(line => {
+                if (line.trim()) {
+                    const parts = line.split('|').map(part => part.trim());
+                    if (parts.length >= 5) {
+                        newChanges.push({
+                            para: parts[0] || '—',
+                            original: parts[1] || '—',
+                            teacher: parts[2] || '—',
+                            replacement: parts[3] || '—',
+                            newTeacher: parts[4] || '—'
+                        });
+                    }
+                }
+            });
+
+            if (newChanges.length > 0) {
+                scheduleChanges = newChanges;
+                localStorage.setItem('scheduleChanges', JSON.stringify(scheduleChanges));
+                updateScheduleChanges();
+                showNotification('Замены успешно загружены из файла', 'success');
+            }
         } catch (error) {
             alert('Ошибка при обработке файла: ' + error.message);
         }
@@ -423,6 +497,11 @@ document.addEventListener('DOMContentLoaded', () => {
         sickStudents = JSON.parse(savedSickStudents);
     }
     
+    // Инициализируем замены из файла данных
+    if (typeof scheduleChangesData !== 'undefined') {
+        scheduleChanges = [...scheduleChangesData];
+    }
+    
     updateDutyInfo();
     displaySchedule();
     updateScheduleChanges();
@@ -431,10 +510,4 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Обновляем изменения каждые 30 минут
     setInterval(updateScheduleChanges, 30 * 60 * 1000);
-});
-
-// Запускаем проверку обновлений каждые 5 минут
-setInterval(fetchChangesFromGoogleSheets, 5 * 60 * 1000);
-
-// Загружаем данные при старте
-fetchChangesFromGoogleSheets(); 
+}); 
